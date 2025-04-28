@@ -1,0 +1,63 @@
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import random
+
+TOKEN = "7753781029:AAFoh47kFGKUKbMH-RW1pMYDkJgqHJ8bXmQ"
+REQUIRED_CHANNEL = "@boost_fedrexcoin5"  # کانالی که کاربر باید عضو شه
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+user_data = {}
+
+def generate_code():
+    return f"FDX-{random.randint(1000, 9999)}"
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    member = await context.bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+
+    if member.status not in ["member", "administrator", "creator"]:
+        join_button = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Join Channel", url=f"https://t.me/{REQUIRED_CHANNEL[1:]}")],
+            [InlineKeyboardButton("✅ I've joined", callback_data="check_membership")]
+        ])
+        await update.message.reply_text("Please join our channel to participate in the giveaway:", reply_markup=join_button)
+        return
+
+    if user_id not in user_data:
+        user_data[user_id] = {
+            "code": generate_code(),
+            "invites": 0,
+            "chance": 1.0,
+        }
+
+    await send_code(update, context, user_id)
+
+async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    member = await context.bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+
+    if member.status not in ["member", "administrator", "creator"]:
+        await query.answer("You still haven't joined the channel!", show_alert=True)
+        return
+
+    if user_id not in user_data:
+        user_data[user_id] = {
+            "code": generate_code(),
+            "invites": 0,
+            "chance": 1.0,
+        }
+
+    await query.message.delete()
+    await send_code(query, context, user_id)
+
+async def send_code(source, context, user_id):
+    code = user_data[user_id]["code"]
+    invite_link = f"https://t.me/federexfdxbot?start={user_id}"
+    message = (
+        f"Congrats! Your giveaway code is: `{code}`\n\n"
+        f"Invite friends to increase your chance!\n
